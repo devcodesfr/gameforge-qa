@@ -8,7 +8,7 @@ This repo tests the apps as products:
 - Buttonz backend
 - GFS to Buttonz auth-code launch flow
 
-The suite is local-first for now. It does not start the apps for you; start the app backends first, then run pytest.
+The suite can run locally against your dev servers, or in GitHub Actions against disposable Postgres databases and checked-out copies of GFS and Buttonz.
 
 ## Current Coverage
 
@@ -46,8 +46,10 @@ copy .env.example .env
 Then fill in:
 
 ```env
-GFS_TEST_USERNAME=your-real-local-test-user
-GFS_TEST_PASSWORD=your-real-local-test-password
+GFS_DEVELOPER_USERNAME=your-local-developer-test-user
+GFS_DEVELOPER_PASSWORD=your-local-developer-test-password
+GFS_GAMER_USERNAME=your-local-gamer-test-user
+GFS_GAMER_PASSWORD=your-local-gamer-test-password
 ```
 
 Do not commit `.env`.
@@ -100,11 +102,28 @@ Run cross-app launch tests only:
 python -m pytest tests/test_cross_app_launch.py -v
 ```
 
-If `GFS_TEST_USERNAME` or `GFS_TEST_PASSWORD` is missing, the cross-app auth test is skipped. That is intentional so basic smoke checks can still run without secrets.
+If role-specific credentials are missing, the cross-app auth test falls back to `GFS_TEST_USERNAME` and `GFS_TEST_PASSWORD`. If no usable credentials are configured, the cross-app auth test is skipped. That is intentional so basic smoke checks can still run without secrets.
+
+## GitHub Actions
+
+The `GameForge Integration Tests` workflow runs this suite automatically for QA repo pushes and pull requests that touch the test harness. It also runs every Monday at 10:00 UTC and supports manual runs from the Actions tab.
+
+In CI, the workflow:
+
+- Checks out `devcodesfr/gameforgestudio-platform`, `devcodesfr/buttonz`, and this QA repo.
+- Starts separate disposable Postgres services for GFS and Buttonz.
+- Pushes both app schemas into those temporary databases.
+- Seeds deterministic GFS QA accounts:
+  - Developer: `qa_developer`
+  - Gamer: `qa_gamer`
+  - Password: `test-password`
+- Starts both backends.
+- Runs `python -m pytest -v --tb=short`.
+
+CI does not use Neon, your local `.env`, or your personal platform account. If the app repos become private, update the workflow checkout steps to use a GitHub token with read access to those repos.
 
 ## Roadmap
 
 - Add role-access tests for Developer vs Gamer API behavior.
-- Add GitHub Actions once local QA stabilizes.
 - Split reusable fixtures for seeded Developer and Gamer accounts.
 - Add deployment smoke checks when GFS and Buttonz have hosted environments.

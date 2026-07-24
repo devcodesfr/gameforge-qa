@@ -1,0 +1,198 @@
+name: GameForge Integration Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 10 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/integration-tests.yml"
+      - "qa_client/**"
+      - "tests/**"
+      - "requirements.txt"
+      - "pytest.ini"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/integration-tests.yml"
+      - "qa_client/**"
+      - "tests/**"
+      - "requirements.txt"
+      - "pytest.ini"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gameforge-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-tests:
+    name: GFS and Buttonz Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      gfs-postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gameforge_test
+          POSTGRES_PASSWORD: gameforge_test
+          POSTGRES_DB: gameforge_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U gameforge_test -d gameforge_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      buttonz-postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: buttonz_test
+          POSTGRES_PASSWORD: buttonz_test
+          POSTGRES_DB: buttonz_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U buttonz_test -d buttonz_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      SESSION_SECRET: github-actions-test-secret-not-for-production
+      GFS_DATABASE_URL: postgresql://gameforge_test:gameforge_test@localhost:5432/gameforge_test
+      BUTTONZ_DATABASE_URL: postgresql://buttonz_test:buttonz_test@localhost:5433/buttonz_test
+      GFS_API_URL: http://127.0.0.1:5000
+      GFS_PUBLIC_URL: http://localhost:5173
+      BUTTONZ_API_URL: http://127.0.0.1:5001
+      GFS_TEST_USERNAME: qa_developer
+      GFS_TEST_PASSWORD: test-password
+      GFS_DEVELOPER_USERNAME: qa_developer
+      GFS_DEVELOPER_PASSWORD: test-password
+      GFS_GAMER_USERNAME: qa_gamer
+      GFS_GAMER_PASSWORD: test-password
+      BUTTONZ_APP_ID: buttonz
+      BUTTONZ_UI_URL: http://localhost:5175
+      BUTTONZ_CALLBACK_URL: http://localhost:5175
+      GAMEFORGE_APP_ID: buttonz
+      GAMEFORGE_PUBLIC_URL: http://localhost:5173
+      GAMEFORGE_API_URL: http://127.0.0.1:5000
+
+    steps:
+      - name: Check out QA suite
+        uses: actions/checkout@v4
+        with:
+          path: gameforge-qa
+
+      - name: Check out GameForgeStudio
+        uses: actions/checkout@v4
+        with:
+          repository: devcodesfr/gameforgestudio-platform
+          path: gameforgestudio-platform
+
+      - name: Check out Buttonz
+        uses: actions/checkout@v4
+        with:
+          repository: devcodesfr/buttonz
+          path: buttonz
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            gameforgestudio-platform/package-lock.json
+            buttonz/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: gameforge-qa/requirements.txt
+
+      - name: Install GFS dependencies
+        working-directory: gameforgestudio-platform
+        run: npm ci
+
+      - name: Install Buttonz dependencies
+        working-directory: buttonz
+        run: npm ci
+
+      - name: Install QA dependencies
+        working-directory: gameforge-qa
+        run: python -m pip install -r requirements.txt
+
+      - name: Prepare GFS database
+        working-directory: gameforgestudio-platform
+        env:
+          DATABASE_URL: ${{ env.GFS_DATABASE_URL }}
+        run: npm run db:push
+
+      - name: Seed GFS QA users
+        working-directory: gameforgestudio-platform
+        env:
+          DATABASE_URL: ${{ env.GFS_DATABASE_URL }}
+        run: npm run db:seed:test
+
+      - name: Prepare Buttonz database
+        working-directory: buttonz
+        env:
+          DATABASE_URL: ${{ env.BUTTONZ_DATABASE_URL }}
+        run: npm run db:push
+
+      - name: Start GFS backend
+        working-directory: gameforgestudio-platform
+        env:
+          DATABASE_URL: ${{ env.GFS_DATABASE_URL }}
+          PORT: 5000
+        run: |
+          npm run dev:server > ../gfs-server.log 2>&1 &
+          echo $! > ../gfs-server.pid
+
+      - name: Start Buttonz backend
+        working-directory: buttonz
+        env:
+          DATABASE_URL: ${{ env.BUTTONZ_DATABASE_URL }}
+          PORT: 5001
+        run: |
+          npm run dev:server > ../buttonz-server.log 2>&1 &
+          echo $! > ../buttonz-server.pid
+
+      - name: Wait for APIs
+        run: |
+          for attempt in {1..30}; do
+            GFS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5000/api/health || true)
+            BUTTONZ_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5001/api/health || true)
+
+            if [[ "$GFS_STATUS" == "200" && "$BUTTONZ_STATUS" == "200" ]]; then
+              echo "Both APIs are healthy."
+              exit 0
+            fi
+
+            echo "Waiting for APIs... attempt $attempt (GFS=$GFS_STATUS, Buttonz=$BUTTONZ_STATUS)"
+            sleep 2
+          done
+
+          echo "The APIs did not start in time."
+          exit 1
+
+      - name: Run Python QA suite
+        working-directory: gameforge-qa
+        run: python -m pytest -v --tb=short
+
+      - name: Print server logs after failure
+        if: failure()
+        run: |
+          echo "========== GFS LOG =========="
+          cat gfs-server.log || true
+
+          echo "========== BUTTONZ LOG =========="
+          cat buttonz-server.log || true
