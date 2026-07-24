@@ -14,6 +14,9 @@ class GfsClient:
     def current_user(self) -> requests.Response:
         return self.session.get(f"{self.base_url}/api/user/current")
 
+    def system_health(self) -> requests.Response:
+        return self.session.get(f"{self.base_url}/api/system-health")
+
     def login(self, username: str, password: str) -> requests.Response:
         return self.session.post(
             f"{self.base_url}/api/auth/login",
