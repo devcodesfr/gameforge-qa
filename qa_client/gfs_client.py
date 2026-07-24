@@ -25,3 +25,12 @@ class GfsClient:
 
     def create_buttonz_launch(self) -> requests.Response:
         return self.session.post(f"{self.base_url}/api/external-apps/buttonz/launch")
+
+    def community_posts(self) -> requests.Response:
+        return self.session.get(f"{self.base_url}/api/community/posts")
+
+    def create_community_post(self, content: str) -> requests.Response:
+        return self.session.post(
+            f"{self.base_url}/api/community/posts",
+            json={"content": content, "type": "text"},
+        )

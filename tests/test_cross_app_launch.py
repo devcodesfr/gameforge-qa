@@ -40,3 +40,14 @@ def test_gfs_to_buttonz_auth_handoff(qa_config: QaConfig) -> None:
         current = buttonz_client.current_user()
         assert current.status_code == 200, f"{account.label}: {current.text}"
         assert current.json()["id"] == gfs_user["id"]
+
+        # A second request proves Buttonz retained its own session after exchange.
+        repeated_current = buttonz_client.current_user()
+        assert repeated_current.status_code == 200, (
+            f"{account.label}: {repeated_current.text}"
+        )
+        assert repeated_current.json()["id"] == gfs_user["id"]
+
+        # Authorization codes are one-time use, even from a fresh Buttonz session.
+        replay = ButtonzClient(qa_config.buttonz_api_url).exchange_gfs_code(code)
+        assert replay.status_code == 401, f"{account.label}: {replay.text}"
