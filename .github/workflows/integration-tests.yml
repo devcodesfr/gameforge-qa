@@ -71,8 +71,6 @@ jobs:
       GFS_API_URL: http://127.0.0.1:5000
       GFS_PUBLIC_URL: http://localhost:5173
       BUTTONZ_API_URL: http://127.0.0.1:5001
-      GFS_TEST_USERNAME: qa_developer
-      GFS_TEST_PASSWORD: test-password
       GFS_DEVELOPER_USERNAME: qa_developer
       GFS_DEVELOPER_PASSWORD: test-password
       GFS_GAMER_USERNAME: qa_gamer

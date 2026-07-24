@@ -102,7 +102,7 @@ Run cross-app launch tests only:
 python -m pytest tests/test_cross_app_launch.py -v
 ```
 
-If role-specific credentials are missing, the cross-app auth test falls back to `GFS_TEST_USERNAME` and `GFS_TEST_PASSWORD`. If no usable credentials are configured, the cross-app auth test is skipped. That is intentional so basic smoke checks can still run without secrets.
+The cross-app auth test runs once for each configured role-specific account. If neither account has usable credentials, the test is skipped so basic smoke checks can still run without secrets.
 
 ## GitHub Actions
 
