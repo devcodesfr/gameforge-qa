@@ -1,6 +1,28 @@
 name: GameForge Integration Tests
 
 on:
+  workflow_call:
+    inputs:
+      gfs_repository:
+        description: Repository containing the GFS revision to test
+        required: false
+        type: string
+        default: devcodesfr/gameforgestudio-platform
+      gfs_ref:
+        description: GFS branch, tag, or commit SHA to test
+        required: false
+        type: string
+        default: main
+      buttonz_repository:
+        description: Repository containing the Buttonz revision to test
+        required: false
+        type: string
+        default: devcodesfr/buttonz
+      buttonz_ref:
+        description: Buttonz branch, tag, or commit SHA to test
+        required: false
+        type: string
+        default: main
   workflow_dispatch:
   schedule:
     - cron: "0 10 * * 1"
@@ -25,7 +47,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: gameforge-integration-${{ github.ref }}
+  group: gameforge-integration-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -86,19 +108,38 @@ jobs:
       - name: Check out QA suite
         uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.gfs_repository && 'devcodesfr/gameforge-qa' || github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ inputs.gfs_repository && 'main' || github.event.pull_request.head.sha || github.sha }}
           path: gameforge-qa
+          persist-credentials: false
 
       - name: Check out GameForgeStudio
         uses: actions/checkout@v4
         with:
-          repository: devcodesfr/gameforgestudio-platform
+          repository: ${{ inputs.gfs_repository || 'devcodesfr/gameforgestudio-platform' }}
+          ref: ${{ inputs.gfs_ref || 'main' }}
           path: gameforgestudio-platform
+          persist-credentials: false
 
       - name: Check out Buttonz
         uses: actions/checkout@v4
         with:
-          repository: devcodesfr/buttonz
+          repository: ${{ inputs.buttonz_repository || 'devcodesfr/buttonz' }}
+          ref: ${{ inputs.buttonz_ref || 'main' }}
           path: buttonz
+          persist-credentials: false
+
+      - name: Report tested revisions
+        env:
+          GFS_REPOSITORY: ${{ inputs.gfs_repository || 'devcodesfr/gameforgestudio-platform' }}
+          GFS_REF: ${{ inputs.gfs_ref || 'main' }}
+          BUTTONZ_REPOSITORY: ${{ inputs.buttonz_repository || 'devcodesfr/buttonz' }}
+          BUTTONZ_REF: ${{ inputs.buttonz_ref || 'main' }}
+        run: |
+          echo "GFS requested: ${GFS_REPOSITORY}@${GFS_REF}"
+          echo "GFS resolved: $(git -C gameforgestudio-platform rev-parse HEAD)"
+          echo "Buttonz requested: ${BUTTONZ_REPOSITORY}@${BUTTONZ_REF}"
+          echo "Buttonz resolved: $(git -C buttonz rev-parse HEAD)"
 
       - name: Set up Node
         uses: actions/setup-node@v4
