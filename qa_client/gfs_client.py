@@ -17,6 +17,12 @@ class GfsClient:
     def system_health(self) -> requests.Response:
         return self.session.get(f"{self.base_url}/api/system-health")
 
+    def update_profile(self, user_id: str, updates: dict[str, object]) -> requests.Response:
+        return self.session.patch(
+            f"{self.base_url}/api/users/{user_id}",
+            json=updates,
+        )
+
     def login(self, username: str, password: str) -> requests.Response:
         return self.session.post(
             f"{self.base_url}/api/auth/login",

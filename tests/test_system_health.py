@@ -6,6 +6,14 @@ from qa_client.config import QaConfig, TestAccount as QaTestAccount
 from qa_client.gfs_client import GfsClient
 
 
+def admin_account(qa_config: QaConfig) -> QaTestAccount:
+    return QaTestAccount(
+        "admin",
+        qa_config.gfs_admin_username,
+        qa_config.gfs_admin_password,
+    )
+
+
 def developer_account(qa_config: QaConfig) -> QaTestAccount:
     return QaTestAccount(
         "developer",
@@ -22,14 +30,20 @@ def gamer_account(qa_config: QaConfig) -> QaTestAccount:
     )
 
 
-def test_developer_can_view_system_health(qa_config: QaConfig) -> None:
-    account = developer_account(qa_config)
+def test_admin_can_view_system_health(qa_config: QaConfig) -> None:
+    account = admin_account(qa_config)
     if not account.has_credentials:
-        pytest.skip("Set GFS Developer test credentials to run system health QA.")
+        pytest.skip("Set GFS Admin Developer test credentials to run system health QA.")
 
     client = GfsClient(qa_config.gfs_api_url)
     login = client.login(account.username or "", account.password or "")
     assert login.status_code == 200, login.text
+
+    current_user = client.current_user()
+    assert current_user.status_code == 200, current_user.text
+    user = current_user.json()
+    assert user["role"] == "developer"
+    assert user["isAdmin"] is True
 
     response = client.system_health()
     assert response.status_code == 200, response.text
@@ -55,6 +69,31 @@ def test_developer_can_view_system_health(qa_config: QaConfig) -> None:
         "unavailable",
         "not_configured",
     }
+
+    attempted_update = client.update_profile(user["id"], {"isAdmin": False})
+    assert attempted_update.status_code == 400, attempted_update.text
+    current_user_after_update = client.current_user()
+    assert current_user_after_update.status_code == 200, current_user_after_update.text
+    assert current_user_after_update.json()["isAdmin"] is True
+
+
+def test_developer_cannot_view_system_health(
+    qa_config: QaConfig,
+) -> None:
+    account = developer_account(qa_config)
+    if not account.has_credentials:
+        pytest.skip("Set GFS Developer test credentials to run system health QA.")
+
+    client = GfsClient(qa_config.gfs_api_url)
+    login = client.login(account.username or "", account.password or "")
+    assert login.status_code == 200, login.text
+
+    current_user = client.current_user()
+    assert current_user.status_code == 200, current_user.text
+    assert current_user.json()["isAdmin"] is False
+
+    response = client.system_health()
+    assert response.status_code == 403
 
 
 def test_gamer_cannot_view_system_health(qa_config: QaConfig) -> None:

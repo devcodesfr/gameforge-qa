@@ -28,6 +28,8 @@ class QaConfig:
     gfs_api_url: str
     gfs_public_url: str
     buttonz_api_url: str
+    gfs_admin_username: str | None
+    gfs_admin_password: str | None
     gfs_developer_username: str | None
     gfs_developer_password: str | None
     gfs_gamer_username: str | None
@@ -47,6 +49,8 @@ def load_config() -> QaConfig:
         gfs_api_url=os.getenv("GFS_API_URL", "http://127.0.0.1:5000").rstrip("/"),
         gfs_public_url=os.getenv("GFS_PUBLIC_URL", "http://localhost:5173").rstrip("/"),
         buttonz_api_url=os.getenv("BUTTONZ_API_URL", "http://127.0.0.1:5001").rstrip("/"),
+        gfs_admin_username=os.getenv("GFS_ADMIN_USERNAME"),
+        gfs_admin_password=os.getenv("GFS_ADMIN_PASSWORD"),
         gfs_developer_username=os.getenv("GFS_DEVELOPER_USERNAME"),
         gfs_developer_password=os.getenv("GFS_DEVELOPER_PASSWORD"),
         gfs_gamer_username=os.getenv("GFS_GAMER_USERNAME"),

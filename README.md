@@ -46,6 +46,8 @@ copy .env.example .env
 Then fill in:
 
 ```env
+GFS_ADMIN_USERNAME=your-local-admin-test-user
+GFS_ADMIN_PASSWORD=your-local-admin-test-password
 GFS_DEVELOPER_USERNAME=your-local-developer-test-user
 GFS_DEVELOPER_PASSWORD=your-local-developer-test-password
 GFS_GAMER_USERNAME=your-local-gamer-test-user
